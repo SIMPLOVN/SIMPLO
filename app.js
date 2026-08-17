@@ -142,6 +142,7 @@ function syncMaterialsToFirestore() {
 
 function loadFromFirestore() {
   if (typeof db === 'undefined') return;
+
   // Carregar dayData
   dayDataRef.get().then(doc => {
     if (doc.exists && doc.data().data) {
@@ -151,9 +152,18 @@ function loadFromFirestore() {
         localStorage.setItem('cal-day-data-v2', JSON.stringify(dayData));
         refreshAll();
         console.log('📥 Dados carregados do Firestore');
+        showToast('☁️ Dados carregados da nuvem!');
       }
+    } else if (Object.keys(dayData).length > 0) {
+      // Firestore vazio mas localStorage tem dados → envia pra nuvem
+      console.log('📤 Enviando dados locais pro Firestore pela primeira vez...');
+      syncDayDataToFirestore();
+      showToast('📤 Seus dados foram enviados pra nuvem!');
     }
-  }).catch(e => console.warn('Firestore load (dayData) falhou:', e));
+  }).catch(e => {
+    console.warn('Firestore load (dayData) falhou:', e);
+    showToast('⚠️ Não foi possível conectar ao banco de dados. Verifique as regras do Firestore.');
+  });
 
   // Carregar materials
   materialsRef.get().then(doc => {
@@ -162,6 +172,9 @@ function loadFromFirestore() {
       subjectMaterials = remote;
       localStorage.setItem('cal-subject-materials', JSON.stringify(subjectMaterials));
       console.log('📥 Materiais carregados do Firestore');
+    } else if (Object.keys(subjectMaterials).length > 0) {
+      // Firestore vazio mas localStorage tem materiais → envia
+      syncMaterialsToFirestore();
     }
   }).catch(e => console.warn('Firestore load (materials) falhou:', e));
 }

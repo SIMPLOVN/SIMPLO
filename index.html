@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Calendário acadêmico de progresso — acompanhe presenças, faltas, provas e notas do semestre 2026.2">
+  <meta name="theme-color" content="#177a4a">
+  <title>Calendário Acadêmico · Progresso 2026.2</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎓</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- TOAST                                               -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div id="toast" class="toast" role="alert" aria-live="polite"></div>
+
+<div class="page">
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- TOPBAR                                              -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <header class="topbar">
+    <div class="topbar-left">
+      <span class="topbar-logo">🎓</span>
+      <div>
+        <h1 class="topbar-title">Calendário Acadêmico</h1>
+        <span class="topbar-subtitle">3 ago &rarr; 4 dez 2026</span>
+      </div>
+    </div>
+    <nav class="topbar-actions">
+      <button class="pill-btn" id="export-btn" title="Exportar dados em CSV">
+        <span class="btn-icon">📥</span> Exportar CSV
+      </button>
+      <button class="pill-btn attn" id="confirm-open-btn" style="display:none;" title="Confirmar presenças pendentes">
+        <span class="btn-icon">⏳</span> Confirmar presenças <span id="pending-count"></span>
+      </button>
+      <button class="icon-btn" id="theme-toggle" title="Alternar tema claro/escuro" aria-label="Alternar tema">🌙</button>
+    </nav>
+  </header>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- HERO — Progresso                                    -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="hero" aria-label="Progresso do período">
+    <div class="hero-content">
+      <p class="hero-eyebrow">Progresso do período</p>
+      <h2 id="hero-title">Sua contagem de dias</h2>
+      <p class="hero-sub" id="hero-sub">Marque cada dia no calendário para acompanhar seu progresso.</p>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill" id="fill"></div>
+      <div class="progress-marker" id="marker">🌱</div>
+    </div>
+    <div class="progress-labels"><span>3 ago</span><span>4 dez</span></div>
+    <div class="hero-decoration" aria-hidden="true"></div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- DASHBOARD — Cards de resumo                         -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="dashboard-grid" id="dashboard" aria-label="Resumo do semestre"></section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- FILTROS E BUSCA                                     -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <section class="filter-bar" aria-label="Filtros do calendário">
+    <div class="filter-search">
+      <span class="search-icon" aria-hidden="true">🔍</span>
+      <input type="search" id="search-input" class="search-input" placeholder="Buscar por nota, matéria ou tipo..." autocomplete="off">
+    </div>
+    <div class="filter-selects">
+      <select id="filter-subject" class="filter-select" aria-label="Filtrar por matéria">
+        <option value="">Todas as matérias</option>
+        <option value="1">Gestão de Marcas</option>
+        <option value="2">Coaching Empresarial</option>
+        <option value="3">Políticas Públicas em Empreendedorismo</option>
+        <option value="4">Investimentos e Financiamentos</option>
+        <option value="5">Gestão de Materiais</option>
+      </select>
+      <select id="filter-status" class="filter-select" aria-label="Filtrar por status">
+        <option value="">Todos os status</option>
+        <option value="presente">Presente</option>
+        <option value="falta">Falta</option>
+        <option value="pendente">Pendente</option>
+      </select>
+      <select id="filter-type" class="filter-select" aria-label="Filtrar por tipo">
+        <option value="">Todos os tipos</option>
+        <option value="aula">Aula</option>
+        <option value="prova">Prova</option>
+        <option value="trabalho">Trabalho</option>
+        <option value="seminario">Seminário</option>
+        <option value="evento">Evento</option>
+      </select>
+      <button class="pill-btn filter-clear" id="filter-clear" title="Limpar filtros" style="display:none;">
+        ✕ Limpar filtros
+      </button>
+    </div>
+  </section>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- LEGENDA                                             -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="legend" aria-label="Legenda de cores">
+    <span><span class="dot" style="background:#dcf3e4;border:1px solid var(--mint-700);"></span>presença confirmada</span>
+    <span><span class="dot" style="background:var(--amber-50);border:1px solid var(--amber-600);"></span>falta confirmada</span>
+    <span><span class="dot" style="background:var(--blue-50);border:1px solid var(--blue-600);"></span>evento importante</span>
+    <span><span class="dot" style="background:var(--mint-50);border:1px solid var(--line);"></span>ainda não ocorreu</span>
+    <span><span class="dot" style="background:#f2f2ef;border:1px solid #ddd;"></span>fim de semana</span>
+    <span><span class="dot" style="background:#fdf1e4;border:1px dashed #e0b073;"></span>feriado</span>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════ -->
+  <!-- LAYOUT PRINCIPAL: Calendário + Sidebar              -->
+  <!-- ═══════════════════════════════════════════════════ -->
+  <div class="layout">
+
+    <!-- COLUNA PRINCIPAL — Meses -->
+    <main class="main-col">
+      <div class="months" id="months" aria-label="Calendário mensal"></div>
+
+      <!-- GRÁFICO DE DESEMPENHO -->
+      <section class="chart-section" aria-label="Gráfico de desempenho por matéria">
+        <div class="chart-header">
+          <h3>📊 Desempenho por Matéria</h3>
+          <span class="chart-hint">Presenças vs faltas registradas</span>
+        </div>
+        <div class="chart-wrapper">
+          <canvas id="chart-canvas" width="700" height="300"></canvas>
+        </div>
+      </section>
+
+      <div class="footer-row">
+        <span class="hint">Clique no dia para marcar presença. Toque no ⋯ para status, tipo, cor, notas e materiais.</span>
+        <button class="pill-btn reset-btn" id="reset-btn">🗑️ Limpar tudo</button>
+      </div>
+    </main>
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <!-- Resumo da Semana -->
+      <section class="side-card week-card">
+        <h3>📅 Esta Semana</h3>
+        <div id="week-summary" class="week-summary"></div>
+      </section>
+
+      <!-- Eventos Importantes -->
+      <section class="side-card">
+        <h3>📌 Eventos Importantes</h3>
+        <div class="event-list" id="important-events"></div>
+      </section>
+
+      <!-- Matérias -->
+      <section class="side-card">
+        <h3>📚 Matérias</h3>
+        <div class="subject-list" id="subjects-list"></div>
+      </section>
+
+    </aside>
+  </div>
+
+</div><!-- /.page -->
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODAL — Detalhes do Dia                             -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true" aria-label="Detalhes do dia">
+  <div class="modal">
+    <div class="modal-head">
+      <p class="modal-date" id="modal-date">Dia</p>
+      <button class="modal-close" id="modal-close" aria-label="Fechar">&times;</button>
+    </div>
+    <div class="modal-class" id="modal-class"></div>
+
+    <p class="modal-section-label">Presença</p>
+    <div class="status-row" id="status-row">
+      <div class="status-opt" data-status="pendente">⏳ Pendente</div>
+      <div class="status-opt" data-status="presente">✔ Presente</div>
+      <div class="status-opt" data-status="falta">✖ Falta</div>
+    </div>
+
+    <p class="modal-section-label">Tipo do dia</p>
+    <div class="type-row">
+      <select class="type-select" id="type-select">
+        <option value="aula">📘 Aula</option>
+        <option value="prova">📝 Prova</option>
+        <option value="trabalho">🗂️ Trabalho</option>
+        <option value="seminario">🎤 Seminário</option>
+        <option value="evento">📌 Outro evento importante</option>
+      </select>
+      <label class="important-check"><input type="checkbox" id="important-check"> ⭐ Importante</label>
+    </div>
+
+    <p class="modal-section-label">Cor do dia <span class="shared-note">(sobrepõe a cor automática)</span></p>
+    <div class="swatches" id="swatches"></div>
+
+    <p class="modal-section-label">Materiais da matéria <span class="shared-note">(vale para todos os dias desta disciplina)</span></p>
+    <div class="materials-box" id="materials-links"></div>
+    <div class="add-link-row" id="add-link-row">
+      <input type="text" id="link-label" placeholder="Título do link" class="link-input">
+      <input type="text" id="link-url" placeholder="https://..." class="link-input">
+      <button class="btn-small" id="add-link-btn">+ Link</button>
+    </div>
+    <div class="materials-box" id="materials-files"></div>
+    <label class="btn-small file-btn">
+      📎 Anexar arquivo
+      <input type="file" id="file-input" style="display:none;">
+    </label>
+    <p class="file-hint">Arquivos ficam salvos no navegador (limite de alguns MB).</p>
+
+    <p class="modal-section-label">Notas pessoais <span class="shared-note">(só deste dia)</span></p>
+    <textarea class="note-input" id="note-input" placeholder="Escreva uma nota sobre este dia..." rows="3"></textarea>
+
+    <div class="modal-actions">
+      <button class="btn" id="modal-cancel">Cancelar</button>
+      <button class="btn btn-primary" id="modal-save">💾 Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODAL — Confirmação de Presença                     -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="overlay" id="confirm-overlay" role="dialog" aria-modal="true" aria-label="Confirmar presença">
+  <div class="confirm-modal">
+    <div class="confirm-icon" aria-hidden="true">📋</div>
+    <div class="confirm-counter" id="confirm-counter"></div>
+    <p class="confirm-q" id="confirm-q">Você compareceu à aula?</p>
+    <p class="confirm-sub" id="confirm-sub"></p>
+    <div class="confirm-actions">
+      <button class="btn-no" id="confirm-no">✖ Não</button>
+      <button class="btn-yes" id="confirm-yes">✔ Sim</button>
+    </div>
+    <button class="confirm-skip" id="confirm-skip">Perguntar depois</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════════ -->
+<!-- MODAL — Confirmação de Reset                        -->
+<!-- ═══════════════════════════════════════════════════ -->
+<div class="overlay" id="reset-overlay" role="dialog" aria-modal="true" aria-label="Confirmar reset">
+  <div class="confirm-modal">
+    <div class="confirm-icon" aria-hidden="true">⚠️</div>
+    <p class="confirm-q">Tem certeza?</p>
+    <p class="confirm-sub">Isso vai apagar todas as presenças, faltas e notas. Esta ação não pode ser desfeita.</p>
+    <div class="confirm-actions">
+      <button class="btn-no" id="reset-cancel">Cancelar</button>
+      <button class="btn-yes" id="reset-confirm" style="background:var(--red-600);border-color:var(--red-600);">🗑️ Limpar tudo</button>
+    </div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>

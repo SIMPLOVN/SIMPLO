@@ -67,8 +67,10 @@ let pendingColor = null, pendingStatus = null;
 let confirmQueue = [];
 
 // ===========================================
-// PERSISTÊNCIA (localStorage)
+// PERSISTÊNCIA (localStorage + Firestore)
 // ===========================================
+let _firestoreSyncing = false;  // Flag para evitar loops de sync
+
 function loadData() {
   try {
     const raw = localStorage.getItem('cal-day-data-v2');
@@ -96,6 +98,7 @@ function loadData() {
 function saveData() {
   try { localStorage.setItem('cal-day-data-v2', JSON.stringify(dayData)); }
   catch(e) { showToast('Erro ao salvar dados. Verifique o espaço do navegador.'); }
+  syncDayDataToFirestore();
 }
 
 function loadMaterials() {
@@ -108,11 +111,95 @@ function loadMaterials() {
 function saveMaterials() {
   try { localStorage.setItem('cal-subject-materials', JSON.stringify(subjectMaterials)); }
   catch(e) { showToast('Erro ao salvar materiais.'); }
+  syncMaterialsToFirestore();
 }
 
 function getMaterials(code) {
   if (!subjectMaterials[code]) subjectMaterials[code] = { links:[], files:[] };
   return subjectMaterials[code];
+}
+
+// ===========================================
+// FIREBASE FIRESTORE — Sincronização
+// ===========================================
+function syncDayDataToFirestore() {
+  if (_firestoreSyncing) return;
+  if (typeof db === 'undefined') return;
+  try {
+    dayDataRef.set({ data: JSON.stringify(dayData), updatedAt: new Date().toISOString() })
+      .catch(e => console.warn('Firestore sync (dayData) falhou:', e));
+  } catch(e) { /* silencioso */ }
+}
+
+function syncMaterialsToFirestore() {
+  if (_firestoreSyncing) return;
+  if (typeof db === 'undefined') return;
+  try {
+    materialsRef.set({ data: JSON.stringify(subjectMaterials), updatedAt: new Date().toISOString() })
+      .catch(e => console.warn('Firestore sync (materials) falhou:', e));
+  } catch(e) { /* silencioso */ }
+}
+
+function loadFromFirestore() {
+  if (typeof db === 'undefined') return;
+  // Carregar dayData
+  dayDataRef.get().then(doc => {
+    if (doc.exists && doc.data().data) {
+      const remote = JSON.parse(doc.data().data);
+      if (Object.keys(remote).length > 0) {
+        dayData = remote;
+        localStorage.setItem('cal-day-data-v2', JSON.stringify(dayData));
+        refreshAll();
+        console.log('📥 Dados carregados do Firestore');
+      }
+    }
+  }).catch(e => console.warn('Firestore load (dayData) falhou:', e));
+
+  // Carregar materials
+  materialsRef.get().then(doc => {
+    if (doc.exists && doc.data().data) {
+      const remote = JSON.parse(doc.data().data);
+      subjectMaterials = remote;
+      localStorage.setItem('cal-subject-materials', JSON.stringify(subjectMaterials));
+      console.log('📥 Materiais carregados do Firestore');
+    }
+  }).catch(e => console.warn('Firestore load (materials) falhou:', e));
+}
+
+function startFirestoreListeners() {
+  if (typeof db === 'undefined') return;
+
+  // Listener tempo real — dayData
+  dayDataRef.onSnapshot(doc => {
+    if (!doc.exists || !doc.data().data) return;
+    try {
+      const remote = JSON.parse(doc.data().data);
+      const local = JSON.stringify(dayData);
+      const remoteStr = JSON.stringify(remote);
+      if (local === remoteStr) return; // Sem mudanças
+      _firestoreSyncing = true;
+      dayData = remote;
+      localStorage.setItem('cal-day-data-v2', remoteStr);
+      refreshAll();
+      showToast('🔄 Dados sincronizados de outro dispositivo!');
+      _firestoreSyncing = false;
+    } catch(e) { _firestoreSyncing = false; }
+  }, e => console.warn('Firestore listener (dayData) erro:', e));
+
+  // Listener tempo real — materials
+  materialsRef.onSnapshot(doc => {
+    if (!doc.exists || !doc.data().data) return;
+    try {
+      const remote = JSON.parse(doc.data().data);
+      if (JSON.stringify(subjectMaterials) === JSON.stringify(remote)) return;
+      _firestoreSyncing = true;
+      subjectMaterials = remote;
+      localStorage.setItem('cal-subject-materials', JSON.stringify(subjectMaterials));
+      _firestoreSyncing = false;
+    } catch(e) { _firestoreSyncing = false; }
+  }, e => console.warn('Firestore listener (materials) erro:', e));
+
+  console.log('👂 Listeners Firestore ativos — sincronização em tempo real!');
 }
 
 // ===========================================
@@ -1240,6 +1327,10 @@ function init() {
 
   // Listeners
   setupEventListeners();
+
+  // Firebase: carregar dados do Firestore e iniciar listeners
+  loadFromFirestore();
+  startFirestoreListeners();
 
   // Animação de entrada
   const page = document.querySelector('.page');

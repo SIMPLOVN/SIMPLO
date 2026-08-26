@@ -733,6 +733,7 @@ a:hover {
   background: var(--glass-bg);
   backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
+  overflow-y: auto;
 }
 
 .side-card-header {

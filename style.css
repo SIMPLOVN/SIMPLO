@@ -1459,6 +1459,10 @@ textarea.note-input:focus { outline: 2px solid var(--mint-300); }
   .sidebar {
     width: 100%;
   }
+  .filter-bar {
+    position: relative;
+    z-index: 1;
+  }
 }
 
 /* ==========================================================================

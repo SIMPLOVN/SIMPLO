@@ -760,6 +760,22 @@ a:hover {
   scrollbar-width: thin;
 }
 
+/* Eventos Importantes */
+.important-event-row {
+  border-radius: var(--radius-sm);
+  padding: 6px 8px;
+  transition: background var(--transition-fast);
+}
+.important-event-row:hover {
+  background: var(--mint-50);
+}
+.important-event-row.past:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+[data-theme="dark"] .important-event-row.past:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
 /* Subjects List */
 .subject-item {
   display: flex;

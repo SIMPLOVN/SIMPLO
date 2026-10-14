@@ -273,7 +273,15 @@ function showToast(msg) {
 // ===========================================
 function updateProgress() {
   const total = totalRangeDays();
-  const count = Object.values(dayData).filter(r => r.status === 'presente').length;
+  let count = 0;
+  for (let d = new Date(START); d <= END; d.setDate(d.getDate()+1)) {
+    if (inRange(d)) {
+      const r = getRecord(dateKey(d));
+      if (r.status === 'presente' || r.status === 'falta') {
+        count++;
+      }
+    }
+  }
   const pct = Math.min(100, (count / total) * 100);
 
   const fill = document.getElementById('fill');

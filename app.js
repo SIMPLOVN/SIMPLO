@@ -28,11 +28,12 @@ const SUBJECTS = {
 };
 const SCHEDULE = { 1:SUBJECTS.CEE010, 2:SUBJECTS.CEE011, 3:SUBJECTS.CEE009, 4:SUBJECTS.AGF013, 5:SUBJECTS.AGS002 };
 
-const HOLIDAYS = new Set(['2026-09-07','2026-10-02','2026-10-12','2026-11-02','2026-11-20']);
+const HOLIDAYS = new Set(['2026-09-07','2026-10-12','2026-10-15','2026-10-28','2026-11-02','2026-11-20']);
 const HOLIDAY_NAMES = {
   '2026-09-07':'Independência do Brasil',
-  '2026-10-02':'Recesso',
   '2026-10-12':'N. Sra. Aparecida',
+  '2026-10-15':'Dia do Professor',
+  '2026-10-28':'Dia do Servidor Público',
   '2026-11-02':'Finados',
   '2026-11-20':'Consciência Negra'
 };
@@ -463,7 +464,14 @@ function updateMonthCount(y, m) {
   let count = 0;
   for (let day = 1; day <= daysInMonth; day++) {
     const d = new Date(y, m, day);
-    if (inRange(d) && getRecord(dateKey(d)).status === 'presente') count++;
+    if (inRange(d)) {
+      const r = getRecord(dateKey(d));
+      if (r.status === 'presente') {
+        const sub = SCHEDULE[d.getDay()];
+        const qtd = (r.qtd !== undefined && r.qtd !== null && !isNaN(r.qtd)) ? Number(r.qtd) : (sub ? sub.faltasPorAula : 4);
+        count += qtd;
+      }
+    }
   }
   el.textContent = count + ' presença' + (count === 1 ? '' : 's');
 }
@@ -474,7 +482,11 @@ function updateMonthCount(y, m) {
 function toggleMarkDirect(key, cell, y, m) {
   const record = getRecord(key);
   const newStatus = record.status === 'presente' ? 'pendente' : 'presente';
-  dayData[key] = { ...record, status: newStatus, confirmedAt: newStatus === 'pendente' ? null : new Date().toISOString() };
+  const d = new Date(y, m, parseInt(cell.dataset.day, 10));
+  const subject = SCHEDULE[d.getDay()];
+  const defaultQtd = subject ? subject.faltasPorAula : 4;
+  const qtd = record.qtd !== undefined ? record.qtd : defaultQtd;
+  dayData[key] = { ...record, status: newStatus, qtd, confirmedAt: newStatus === 'pendente' ? null : new Date().toISOString() };
   renderCellContent(cell, key, true);
   const day = parseInt(cell.dataset.day, 10);
   if (sameDay(new Date(y, m, day), NOW)) cell.classList.add('today');
@@ -496,13 +508,16 @@ function iterateSubjectDays(code, fn) {
 
 function subjectStats(code) {
   const subject = SUBJECTS[code];
-  let presencas = 0, faltasRegistradas = 0;
+  let presencas = 0, faltasRegistradas = 0, faltasContab = 0;
   iterateSubjectDays(code, (d, r) => {
-    if (r.status === 'presente') presencas++;
-    if (r.status === 'falta') faltasRegistradas++;
+    const qtd = r.qtd !== undefined ? r.qtd : subject.faltasPorAula;
+    if (r.status === 'presente') presencas += qtd;
+    if (r.status === 'falta') {
+      faltasRegistradas++;
+      faltasContab += qtd;
+    }
   });
-  const contabilizadas = faltasRegistradas * subject.faltasPorAula;
-  return { presencas, faltasRegistradas, contabilizadas, limite: subject.limiteFaltas };
+  return { presencas, faltasRegistradas, contabilizadas: faltasContab, limite: subject.limiteFaltas };
 }
 
 function renderSubjects() {
@@ -549,24 +564,94 @@ function renderImportantEvents() {
       const d = new Date(y, m-1, dd);
       if (d < START || d > END) return;
       const subject = SCHEDULE[d.getDay()];
-      events.push({ date:d, record:r, subject });
+      events.push({ date:d, record:r, subject, key });
     }
   });
-  events.sort((a, b) => a.date - b.date);
+
   box.innerHTML = '';
   if (events.length === 0) {
     box.innerHTML = '<div style="font-size:0.8rem;color:var(--ink-soft);">Nenhum evento marcado ainda. Abra os detalhes de um dia e escolha um tipo (prova, trabalho, seminário...) para vê-lo aqui.</div>';
     return;
   }
-  events.forEach(ev => {
-    const row = document.createElement('div');
-    row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:0.85rem;';
-    row.innerHTML =
-      '<span style="font-size:1.1rem;flex-shrink:0;">' + (TYPE_ICON[ev.record.type] || '📌') + '</span>' +
-      '<div><strong>' + (ev.subject ? ev.subject.nome : 'Evento') + ' — ' + TYPE_LABEL[ev.record.type] + '</strong>' +
-      '<div style="color:var(--ink-soft);font-size:0.75rem;margin-top:2px;">' + formatDateShort(ev.date) + '</div></div>';
-    box.appendChild(row);
-  });
+
+  const todayStart = new Date(NOW.getFullYear(), NOW.getMonth(), NOW.getDate());
+  const upcomingEvents = events.filter(ev => ev.date >= todayStart).sort((a, b) => a.date - b.date);
+  const pastEvents = events.filter(ev => ev.date < todayStart).sort((a, b) => b.date - a.date);
+
+  if (upcomingEvents.length > 0) {
+    const upHeader = document.createElement('div');
+    upHeader.style.cssText = 'font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--ink-soft);letter-spacing:0.05em;margin-bottom:6px;';
+    upHeader.textContent = 'Próximos';
+    box.appendChild(upHeader);
+
+    upcomingEvents.forEach(ev => {
+      const daysDiff = Math.round((ev.date - todayStart) / (1000 * 60 * 60 * 24));
+      let badgeText = '';
+      let badgeStyle = '';
+      if (daysDiff === 0) {
+        badgeText = 'Hoje!';
+        badgeStyle = 'background:var(--danger-color);color:#fff;';
+      } else if (daysDiff === 1) {
+        badgeText = 'Amanhã';
+        badgeStyle = 'background:var(--amber-500);color:#fff;';
+      } else {
+        badgeText = 'Em ' + daysDiff + ' dias';
+        badgeStyle = 'background:var(--mint-50);color:var(--mint-700);border:1px solid var(--mint-300);';
+      }
+
+      const row = document.createElement('div');
+      row.className = 'important-event-row';
+      row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:0.85rem;cursor:pointer;';
+      row.title = 'Clique para ver detalhes do dia ' + formatDateShort(ev.date);
+      row.innerHTML =
+        '<span style="font-size:1.1rem;flex-shrink:0;">' + (TYPE_ICON[ev.record.type] || '📌') + '</span>' +
+        '<div style="flex:1;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
+            '<strong>' + (ev.subject ? ev.subject.nome : 'Evento') + ' — ' + TYPE_LABEL[ev.record.type] + '</strong>' +
+            '<span style="font-size:0.65rem;padding:2px 6px;border-radius:10px;font-weight:600;white-space:nowrap;' + badgeStyle + '">' + badgeText + '</span>' +
+          '</div>' +
+          '<div style="color:var(--ink-soft);font-size:0.75rem;margin-top:2px;">' + formatDateShort(ev.date) + (ev.record.note ? ' · ' + ev.record.note : '') + '</div>' +
+        '</div>';
+      row.addEventListener('click', () => {
+        const cell = document.querySelector(`.day[data-year="${ev.date.getFullYear()}"][data-month="${ev.date.getMonth()}"][data-day="${ev.date.getDate()}"]`);
+        openModal(ev.key, cell || document.body, ev.date);
+      });
+      box.appendChild(row);
+    });
+  } else {
+    const noUp = document.createElement('div');
+    noUp.style.cssText = 'font-size:0.8rem;color:var(--ink-soft);padding:4px 0 8px;';
+    noUp.textContent = 'Nenhum evento futuro pendente.';
+    box.appendChild(noUp);
+  }
+
+  if (pastEvents.length > 0) {
+    const pastHeader = document.createElement('div');
+    pastHeader.style.cssText = 'font-size:0.75rem;font-weight:700;text-transform:uppercase;color:var(--ink-soft);letter-spacing:0.05em;margin:14px 0 6px;';
+    pastHeader.innerHTML = '<span>Já Passaram (' + pastEvents.length + ')</span>';
+    box.appendChild(pastHeader);
+
+    pastEvents.forEach(ev => {
+      const row = document.createElement('div');
+      row.className = 'important-event-row past';
+      row.style.cssText = 'display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);font-size:0.85rem;cursor:pointer;opacity:0.6;';
+      row.title = 'Clique para ver detalhes do dia ' + formatDateShort(ev.date);
+      row.innerHTML =
+        '<span style="font-size:1.1rem;flex-shrink:0;filter:grayscale(80%);">' + (TYPE_ICON[ev.record.type] || '📌') + '</span>' +
+        '<div style="flex:1;">' +
+          '<div style="display:flex;justify-content:space-between;align-items:center;gap:4px;">' +
+            '<strong style="color:var(--ink-soft);">' + (ev.subject ? ev.subject.nome : 'Evento') + ' — ' + TYPE_LABEL[ev.record.type] + '</strong>' +
+            '<span style="font-size:0.65rem;background:var(--line);color:var(--ink-soft);padding:2px 6px;border-radius:4px;font-weight:600;white-space:nowrap;">Já passou</span>' +
+          '</div>' +
+          '<div style="color:var(--ink-soft);font-size:0.75rem;margin-top:2px;">' + formatDateShort(ev.date) + ' (Concluído)' + (ev.record.note ? ' · ' + ev.record.note : '') + '</div>' +
+        '</div>';
+      row.addEventListener('click', () => {
+        const cell = document.querySelector(`.day[data-year="${ev.date.getFullYear()}"][data-month="${ev.date.getMonth()}"][data-day="${ev.date.getDate()}"]`);
+        openModal(ev.key, cell || document.body, ev.date);
+      });
+      box.appendChild(row);
+    });
+  }
 }
 
 // ===========================================
@@ -636,7 +721,7 @@ function renderDashboard() {
     if (!proximaProva && r.type === 'prova' && endsAt >= NOW) proximaProva = new Date(d);
   }
 
-  const freqBase = totalPresencas + Object.keys(SUBJECTS).reduce((sum, c) => sum + subjectStats(c).faltasRegistradas, 0);
+  const freqBase = totalPresencas + totalFaltasContab;
   const freqPct = freqBase > 0 ? Math.round((totalPresencas / freqBase) * 100) : 100;
 
   const cards = [
@@ -694,7 +779,7 @@ function renderChart() {
   // Coletar dados
   const data = subjects.map(s => {
     const stats = subjectStats(s.code);
-    return { code: s.code, nome: s.nome, presencas: stats.presencas, faltas: stats.faltasRegistradas };
+    return { code: s.code, nome: s.nome, presencas: stats.presencas, faltas: stats.contabilizadas };
   });
 
   let maxVal = Math.max(10, ...data.map(d => Math.max(d.presencas, d.faltas)));
@@ -977,6 +1062,18 @@ function setStatusUI(status) {
     el.classList.toggle('active', s === status);
     el.classList.toggle(s, true); // Adiciona classe do status para CSS
   });
+  const qtdRow = document.getElementById('qtd-row');
+  const qtdLabel = document.getElementById('qtd-label');
+  if (qtdRow) {
+    if (status === 'presente' || status === 'falta') {
+      qtdRow.style.display = 'flex';
+      if (qtdLabel) {
+        qtdLabel.textContent = status === 'presente' ? 'Presenças nesta aula:' : 'Faltas nesta aula:';
+      }
+    } else {
+      qtdRow.style.display = 'none';
+    }
+  }
 }
 
 function openModal(key, cell, d) {
@@ -1012,6 +1109,21 @@ function openModal(key, cell, d) {
 
   // Status, tipo, importante, nota, cor
   setStatusUI(record.status);
+  
+  const qtdInput = document.getElementById('qtd-input');
+  if (qtdInput) {
+    const defaultVal = subject ? subject.faltasPorAula : 4;
+    const currentVal = record.qtd !== undefined ? record.qtd : defaultVal;
+    qtdInput.value = currentVal;
+    document.querySelectorAll('.qtd-quick-btn').forEach(b => {
+      const match = parseInt(b.dataset.qtd, 10) === parseInt(currentVal, 10);
+      b.style.borderColor = match ? 'var(--mint-600)' : 'var(--line)';
+      b.style.background = match ? 'var(--mint-100)' : 'var(--paper)';
+      b.style.color = match ? 'var(--mint-800)' : 'var(--ink)';
+      b.style.fontWeight = match ? '700' : '400';
+    });
+  }
+
   const typeSelect = document.getElementById('type-select');
   if (typeSelect) typeSelect.value = record.type;
   const impCheck = document.getElementById('important-check');
@@ -1042,10 +1154,12 @@ function saveModalData() {
   const note = (document.getElementById('note-input')?.value || '').trim();
   const type = document.getElementById('type-select')?.value || 'aula';
   const important = document.getElementById('important-check')?.checked || false;
+  const qtdInput = document.getElementById('qtd-input');
+  const qtd = qtdInput ? parseInt(qtdInput.value, 10) : 4;
 
   dayData[activeKey] = {
     status: pendingStatus,
-    note, color: pendingColor, type, important,
+    note, color: pendingColor, type, important, qtd,
     confirmedAt: pendingStatus === 'pendente' ? null : new Date().toISOString()
   };
 
@@ -1103,10 +1217,12 @@ function showNextConfirm() {
   const counter = document.getElementById('confirm-counter');
   const q = document.getElementById('confirm-q');
   const sub = document.getElementById('confirm-sub');
+  const qtdInput = document.getElementById('confirm-qtd-input');
 
   if (counter) counter.textContent = confirmQueue.length + ' pendente' + (confirmQueue.length === 1 ? '' : 's');
   if (q) q.textContent = 'Você compareceu à aula de ' + (subject ? subject.nome : '') + '?';
   if (sub) sub.textContent = formatDateShort(item.date) + ' de 2026';
+  if (qtdInput) qtdInput.value = subject ? subject.faltasPorAula : 4;
 
   const overlay = document.getElementById('confirm-overlay');
   if (overlay) overlay.classList.add('active');
@@ -1116,7 +1232,9 @@ function answerConfirm(status) {
   const item = confirmQueue.shift();
   if (item) {
     const record = getRecord(item.key);
-    dayData[item.key] = { ...record, status, confirmedAt: new Date().toISOString() };
+    const qtdEl = document.getElementById('confirm-qtd-input');
+    const qtd = qtdEl ? parseInt(qtdEl.value, 10) || 4 : 4;
+    dayData[item.key] = { ...record, status, qtd, confirmedAt: new Date().toISOString() };
     rebuildCalendarUI();
     saveData();
   }
@@ -1196,6 +1314,33 @@ function setupEventListeners() {
   // --- Modal: status ---
   document.querySelectorAll('.status-opt').forEach(opt => {
     opt.addEventListener('click', () => setStatusUI(opt.dataset.status));
+  });
+
+  // --- Modal: atalhos de quantidade de aulas ---
+  document.querySelectorAll('.qtd-quick-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const q = parseInt(btn.dataset.qtd, 10);
+      const input = document.getElementById('qtd-input');
+      if (input) input.value = q;
+      document.querySelectorAll('.qtd-quick-btn').forEach(b => {
+        const match = b === btn;
+        b.style.borderColor = match ? 'var(--mint-600)' : 'var(--line)';
+        b.style.background = match ? 'var(--mint-100)' : 'var(--paper)';
+        b.style.color = match ? 'var(--mint-800)' : 'var(--ink)';
+        b.style.fontWeight = match ? '700' : '400';
+      });
+    });
+  });
+
+  document.getElementById('qtd-input')?.addEventListener('input', (e) => {
+    const val = parseInt(e.target.value, 10);
+    document.querySelectorAll('.qtd-quick-btn').forEach(b => {
+      const match = parseInt(b.dataset.qtd, 10) === val;
+      b.style.borderColor = match ? 'var(--mint-600)' : 'var(--line)';
+      b.style.background = match ? 'var(--mint-100)' : 'var(--paper)';
+      b.style.color = match ? 'var(--mint-800)' : 'var(--ink)';
+      b.style.fontWeight = match ? '700' : '400';
+    });
   });
 
   // --- Modal: fechar ---

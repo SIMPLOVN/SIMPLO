@@ -180,6 +180,22 @@
       <div class="status-opt" data-status="presente">✔ Presente</div>
       <div class="status-opt" data-status="falta">✖ Falta</div>
     </div>
+    <div class="qtd-row" id="qtd-row" style="display: none; flex-direction: column; gap: 6px; margin: 10px 0 16px; background: var(--mint-50); padding: 10px 12px; border-radius: var(--radius-md); border: 1px solid var(--line);">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <label id="qtd-label" for="qtd-input" style="font-size: 0.8rem; color: var(--ink); font-weight: 600;">Presenças nesta aula:</label>
+        <div style="display: flex; align-items: center; gap: 6px;">
+          <input type="number" id="qtd-input" min="0" max="10" value="4" class="type-select" style="width: 55px; padding: 4px 6px; text-align: center; font-weight: 700; min-width: unset; flex: none;">
+          <span style="font-size: 0.75rem; color: var(--ink-soft);">aulas</span>
+        </div>
+      </div>
+      <div style="display: flex; gap: 6px; align-items: center; margin-top: 2px;">
+        <span style="font-size: 0.7rem; color: var(--ink-soft);">Atalhos:</span>
+        <button type="button" class="qtd-quick-btn" data-qtd="1" style="border: 1px solid var(--line); background: var(--paper); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer;">1</button>
+        <button type="button" class="qtd-quick-btn" data-qtd="2" style="border: 1px solid var(--line); background: var(--paper); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer;">2</button>
+        <button type="button" class="qtd-quick-btn" data-qtd="3" style="border: 1px solid var(--line); background: var(--paper); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer;">3</button>
+        <button type="button" class="qtd-quick-btn" data-qtd="4" style="border: 1px solid var(--line); background: var(--paper); border-radius: 4px; padding: 2px 8px; font-size: 0.75rem; cursor: pointer; font-weight: 600;">4 (Padrão)</button>
+      </div>
+    </div>
 
     <p class="modal-section-label">Tipo do dia</p>
     <div class="type-row">
@@ -229,6 +245,13 @@
     <div class="confirm-counter" id="confirm-counter"></div>
     <p class="confirm-q" id="confirm-q">Você compareceu à aula?</p>
     <p class="confirm-sub" id="confirm-sub"></p>
+    <div class="confirm-qtd-row" style="margin: 8px 0 14px; display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <span style="font-size: 0.75rem; color: var(--ink-soft); font-weight: 500;">Quantidade de presenças/faltas:</span>
+      <div style="display: flex; gap: 6px; align-items: center;">
+        <input type="number" id="confirm-qtd-input" min="1" max="10" value="4" style="width: 50px; text-align: center; padding: 4px 6px; border: 1px solid var(--line); border-radius: 6px; font-weight: 700; font-size: 0.9rem;">
+        <span style="font-size: 0.75rem; color: var(--ink-soft);">aulas</span>
+      </div>
+    </div>
     <div class="confirm-actions">
       <button class="btn-no" id="confirm-no">✖ Não</button>
       <button class="btn-yes" id="confirm-yes">✔ Sim</button>
